@@ -113,7 +113,7 @@ const virtualDomSnapshotB: VirtualNode = {
           props: {
             style: 'color: green;',
           },
-          children: [' does not change!'],
+          children: [' does not changing!'],
         },
       ],
     },
