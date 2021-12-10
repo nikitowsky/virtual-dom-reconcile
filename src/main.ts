@@ -1,8 +1,8 @@
-interface VirtualNode {
-  tag: string;
-  props: Record<string, any> | null;
-  children: (VirtualNode | string)[] | null;
-}
+type VirtualNode = [
+  keyof HTMLElementTagNameMap,
+  Record<string, string | number> | null,
+  (VirtualNode | string)[] | null,
+];
 
 // Create a DOM element
 const createElement = (virtualNode: VirtualNode | string) => {
@@ -10,18 +10,19 @@ const createElement = (virtualNode: VirtualNode | string) => {
     return document.createTextNode(virtualNode);
   }
 
-  const element = document.createElement(virtualNode.tag);
+  const [tag, props, children] = virtualNode;
+  const element = document.createElement(tag);
 
   // Apply props
-  if (virtualNode.props) {
-    Object.entries(virtualNode.props).map(([key, value]) => {
-      element.setAttribute(key, value);
+  if (props) {
+    Object.entries(props).map(([key, value]) => {
+      element.setAttribute(key, String(value));
     });
   }
 
   // Recursively create children DOM elements and append it to the main element
-  if (Array.isArray(virtualNode.children)) {
-    virtualNode.children
+  if (Array.isArray(children)) {
+    children
       .map(createElement)
       .forEach((childElement) => element.appendChild(childElement));
   }
@@ -36,12 +37,15 @@ const changed = (nodeA?: VirtualNode, nodeB?: VirtualNode): boolean => {
     typeof nodeA === 'string' && typeof nodeB === 'string';
   const stringAreDifferent = typesAreStrings && nodeA !== nodeB;
 
+  const [tagA, propsA] = nodeA ?? [];
+  const [tagB, propsB] = nodeB ?? [];
+
   // "props" are changed
   if (nodeA !== undefined && nodeB !== undefined && !typesAreStrings) {
-    return JSON.stringify(nodeA.props) !== JSON.stringify(nodeB.props);
+    return JSON.stringify(propsA) !== JSON.stringify(propsB);
   }
 
-  return typesAreDifferent || stringAreDifferent || nodeA!.tag !== nodeB!.tag;
+  return typesAreDifferent || stringAreDifferent || tagA !== tagB;
 };
 
 const update = (
@@ -64,18 +68,13 @@ const update = (
     root.replaceChild(createElement(nextVirtualNode), root.childNodes[index]);
   } else if (!bothAreStrings) {
     // Recursively updated DOM
-    for (
-      let i = 0;
-      i <
-      Math.max(
-        currentVirtualNode.children!.length,
-        nextVirtualNode.children!.length,
-      );
-      i++
-    ) {
+    const [, , childrenA] = currentVirtualNode;
+    const [, , childrenB] = nextVirtualNode;
+
+    for (let i = 0; i < Math.max(childrenA!.length, childrenB!.length); i++) {
       update(
-        (currentVirtualNode.children as VirtualNode[])[i],
-        (nextVirtualNode.children as VirtualNode[])[i],
+        (childrenA as VirtualNode[])[i],
+        (childrenB as VirtualNode[])[i],
         i,
         root.childNodes[index],
       );
@@ -83,42 +82,30 @@ const update = (
   }
 };
 
-const virtualDomSnapshotA: VirtualNode = {
-  tag: 'div',
-  props: {
+const virtualDomSnapshotA: VirtualNode = [
+  'div',
+  {
     'data-testid': 0,
   },
-  children: [
-    {
-      tag: 'h1',
-      props: null,
-      children: ['See how DOM element with [data-testid=0]'],
-    },
-  ],
-};
+  [['h1', null, ['See how DOM element with [data-testid=0]']]],
+];
 
-const virtualDomSnapshotB: VirtualNode = {
-  tag: 'div',
-  props: {
+const virtualDomSnapshotB: VirtualNode = [
+  'div',
+  {
     'data-testid': 0,
   },
-  children: [
-    {
-      tag: 'h1',
-      props: null,
-      children: [
+  [
+    [
+      'h1',
+      null,
+      [
         'See how DOM element with [data-testid=0]',
-        {
-          tag: 'highlight',
-          props: {
-            style: 'color: green;',
-          },
-          children: [' does not changing!'],
-        },
+        ['span', { style: 'color: green;' }, [' does not changing!']],
       ],
-    },
+    ],
   ],
-};
+];
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
